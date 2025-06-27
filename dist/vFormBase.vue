@@ -1,5 +1,5 @@
 <template>
-  <v-layout :id="ref" v-resize.quiet="onResize" class="wrap">
+  <v-row :id="ref" v-resize.quiet="onResize" class="wrap">
     <!-- FORM-BASE TOP SLOT -->
     <slot :name="getFormTopSlot()" />
 
@@ -11,7 +11,7 @@
         v-bind="getShorthandTooltip(obj.schema.tooltip)"
       >
         <template v-slot:activator="{ on }">
-          <v-flex
+          <v-col
             v-show="!obj.schema.hidden"
             :key="index"
             v-intersect="
@@ -331,7 +331,7 @@
             <!-- slot at bottom of item  -> <div slot="slot-bottom-key-[deep-nested-key-name]"> -->
             <slot :name="getTypeBottomSlot(obj)" />
             <slot :name="getKeyBottomSlot(obj)" />
-          </v-flex>
+          </v-col>
 
           <!-- schema.spacer:true - push next item to the right and fill space between items -->
           <v-spacer v-if="obj.schema.spacer" :key="`s-${index}`" />
@@ -344,7 +344,7 @@
     </template>
     <!-- FORM-BASE BOTTOM SLOT -->
     <slot :name="getFormBottomSlot()" />
-  </v-layout>
+  </v-row>
 </template>
 
 <script>
@@ -618,32 +618,33 @@ export default {
     getTypeClassName (obj) {
       return this.getTypeClassNameWithAppendix(obj, typeClassAppendix)
     },
-    getFlexGridClassName (obj) {
-      // get FLEX class from schema.flex ->  schema:{ flex:{ xs:12, md:4  } || flex: 4 } // flex: 4 -> is shorthand for -> flex:{ xs:4 }
+    getColGridClassName (obj) {
+      // get COL class from schema.col ->  schema:{ col:{ xs:12, md:4  } || col: 4 } // col: 4 -> is shorthand for -> col:{ xs:4 }
       const keysToGridClassName = key =>
         Object.keys(key)
-          .map(k => k + key[k])
-          .join(' ') //  { xs:12, md:6, lg:4  } => 'xs12 md6 lg4'
+          .map(k => `col-${k}-${key[k]}`)
+          .join(' ') //  { xs:12, md:6, lg:4  } => 'col-xs-12 col-md-6 col-lg-4'
+          
       return obj.schema.flex
         ? isPlainObject(obj.schema.flex)
           ? keysToGridClassName(obj.schema.flex)
-          : `xs${obj.schema.flex}`
+          : `col-xs-${obj.schema.flex}`
         : ''
     },
     getOffsetGridClassName (obj) {
-      // get OFFSET-FLEX class from schema.offset ->  schema:{ offset:{ xs:12, md:4  } || offset: 4 } // offset: 4 -> is shorthand for -> offset:{ xs:4 }
+      // get OFFSET-COL class from schema.offset ->  schema:{ offset:{ xs:12, md:4  } || offset: 4 } // offset: 4 -> is shorthand for -> offset:{ xs:4 }
       const keysToOffsetClassName = key =>
         Object.keys(key)
-          .map(k => `offset-${k}${key[k]}`)
+          .map(k => `offset-${k}-${key[k]}`)
           .join(' ') //  { xs:12, md:6, lg:4  } => 'xs12 md6 lg4'
       return obj.schema.offset
         ? isPlainObject(obj.schema.offset)
           ? keysToOffsetClassName(obj.schema.offset)
-          : `offset-xs${obj.schema.offset}`
+          : `offset-xs-${obj.schema.offset}`
         : ''
     },
     getOrderGridClassName (obj) {
-      // get ORDER-FLEX class from schema.order ->  schema:{ order:{ xs:12, md:4  } || order: 4 } // order: 4 -> is shorthand for -> order:{ xs:4 }
+      // get ORDER-COL class from schema.order ->  schema:{ order:{ xs:12, md:4  } || order: 4 } // order: 4 -> is shorthand for -> order:{ xs:4 }
       const keysToOrderClassName = key =>
         Object.keys(key)
           .map(k => `order-${k}${key[k]}`)
@@ -655,8 +656,8 @@ export default {
         : ''
     },
     getGridClassName (obj) {
-      // combine Flex, Offset, Order into a classname
-      return `${this.getFlexGridClassName(obj)} ${this.getOffsetGridClassName(
+      // combine Col, Offset, Order into a classname
+      return `${this.getColGridClassName(obj)} ${this.getOffsetGridClassName(
         obj
       )} ${this.getOrderGridClassName(obj)}`
     },
