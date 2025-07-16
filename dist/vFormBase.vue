@@ -297,7 +297,6 @@
                 <v-text-field
                   v-else-if="obj.schema.type === 'password'"
                   :type="passwordField.options[passwordField.active].type"
-                  v-mask="obj.schema.mask"
                   v-bind="obj.schema"
                   :append-icon="passwordField.options[passwordField.active].icon"
                   :value="setValue(obj)"
