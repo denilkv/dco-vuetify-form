@@ -294,6 +294,23 @@
                   </v-icon>
                 </v-btn>
 
+                <v-text-field
+                  v-else-if="obj.schema.type === 'password'"
+                  :type="passwordField.options[passwordField.active].type"
+                  v-mask="obj.schema.mask"
+                  v-bind="obj.schema"
+                  :append-icon="passwordField.options[passwordField.active].icon"
+                  :value="setValue(obj)"
+                  @focus="onEvent($event, obj)"
+                  @blur="onEvent($event, obj)"
+                  @click:append="onAppendIconClick(passwordField)"
+                  @click:append-outer="onEvent($event, obj, appendOuter)"
+                  @click:clear="onEvent($event, obj, clear)"
+                  @click:prepend="onEvent($event, obj, prepend)"
+                  @click:prepend-inner="onEvent($event, obj, prependInner)"
+                  @input="onInput($event, obj)"
+                />
+
                 <!-- only masked v-text-field use this Section - https://vuejs-tips.github.io/vue-the-mask/  -->
                 <v-text-field
                   v-else-if="obj.schema.mask"
@@ -730,6 +747,12 @@ export default {
         data: this.storeStateData,
         schema: this.storeStateSchema
       })
+    },
+    onAppendIconClick () {
+      this.passwordField = {
+        ...this.passwordField,
+        active: this.passwordField.active === 'password' ? 'text' : 'password'
+      }
     },
     onEvent (event, obj, tag) {
       delay(() => {
