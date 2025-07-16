@@ -485,7 +485,20 @@ export default {
       prependInner,
       menu: false,
       date: '',
-      datePic: ''
+      datePic: '',
+      passwordField: {
+        active: 'password',
+        options: {
+          password: {
+            type: 'password',
+            icon: 'mdi-eye'
+          },
+          text: {
+            type: 'text',
+            icon: 'mdi-eye-off'
+          },
+        }
+      }
     }
   },
   computed: {
