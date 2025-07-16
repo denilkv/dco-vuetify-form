@@ -491,11 +491,11 @@ export default {
         options: {
           password: {
             type: 'password',
-            icon: 'mdi-eye'
+            icon: 'mdi-eye-off'
           },
           text: {
             type: 'text',
-            icon: 'mdi-eye-off'
+            icon: 'mdi-eye'
           },
         }
       }
