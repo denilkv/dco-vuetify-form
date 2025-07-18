@@ -296,13 +296,13 @@
 
                 <v-text-field
                   v-else-if="obj.schema.type === 'password'"
-                  :type="passwordField.options[passwordField.active].type"
+                  :type="obj.passwordVisible ? 'text' : 'password'"
                   v-bind="obj.schema"
-                  :append-icon="passwordField.options[passwordField.active].icon"
+                  :append-icon="obj.passwordVisible ? 'mdi-eye' : 'mdi-eye-off'"
                   :value="setValue(obj)"
                   @focus="onEvent($event, obj)"
                   @blur="onEvent($event, obj)"
-                  @click:append="onAppendIconClick(passwordField)"
+                  @click:append="togglePasswordVisibility(obj)"
                   @click:append-outer="onEvent($event, obj, appendOuter)"
                   @click:clear="onEvent($event, obj, clear)"
                   @click:prepend="onEvent($event, obj, prepend)"
@@ -760,11 +760,8 @@ export default {
         schema: this.storeStateSchema
       })
     },
-    onAppendIconClick () {
-      this.passwordField = {
-        ...this.passwordField,
-        active: this.passwordField.active === 'password' ? 'text' : 'password'
-      }
+    togglePasswordVisibility (obj) {
+      this.$set(obj, 'passwordVisible', !obj.passwordVisible)
     },
     onEvent (event, obj, tag) {
       delay(() => {
@@ -890,6 +887,7 @@ export default {
       })
       return { data, schema }
     },
+
     combineObjectsToArray ({ data, schema }) {
       let arr = []
       Object.keys(data).forEach(key => {
@@ -901,7 +899,12 @@ export default {
           )
           return
         }
-        arr.push({ key, value: data[key], schema: schema[key] })
+        // Initialize passwordVisible for password type fields
+        const objData = { key, value: data[key], schema: schema[key] }
+        if (schema[key].type === 'password') {
+          objData.passwordVisible = false
+        }
+        arr.push(objData)
       })
       return arr
     },
