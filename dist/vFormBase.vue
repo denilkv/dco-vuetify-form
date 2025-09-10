@@ -1,22 +1,18 @@
 <template>
-  <v-row :id="ref" v-resize.quiet="onResize" class="wrap">
+  <v-row :id="ref" class="wrap">
     <!-- FORM-BASE TOP SLOT -->
     <slot :name="getFormTopSlot()" />
 
-    <template v-for="(obj, index) in flatCombinedArraySorted">
+    <template v-for="(obj, index) in flatCombinedArraySorted" :key="index">
       <!-- Tooltip Wrapper -->
       <v-tooltip
-        :key="index"
         :disabled="!obj.schema.tooltip"
         v-bind="getShorthandTooltip(obj.schema.tooltip)"
       >
-        <template v-slot:activator="{ on }">
+        <template #activator="{ props }">
           <v-col
             v-show="!obj.schema.hidden"
             :key="index"
-            v-intersect="
-              (entries, observer) => onIntersect(entries, observer, obj)
-            "
             v-touch="{
               left: () => onSwipe('left', obj),
               right: () => onSwipe('right', obj),
@@ -26,7 +22,7 @@
             :class="getClassName(obj)"
             @mouseenter="onEvent($event, obj)"
             @mouseleave="onEvent($event, obj)"
-            v-on="on"
+            v-bind="props"
           >
             <!-- slot on top of type  -> <div slot="slot-bottom-type-[propertyName]"> -->
             <slot :name="getTypeTopSlot(obj)" />
@@ -41,8 +37,8 @@
                 <v-radio-group
                   v-if="obj.schema.type === 'radio'"
                   v-bind="obj.schema"
-                  :value="setValue(obj)"
-                  @change="onInput($event, obj)"
+                  :model-value="setValue(obj)"
+                  @update:modelValue="onInput($event, obj)"
                 >
                   <v-radio
                     v-for="(o, ix) in obj.schema.options"
@@ -75,18 +71,29 @@
                 <!-- select -->
                 <v-select
                   v-else-if="obj.schema.type === 'select'"
-                  :value="setValue(obj)"
+                  :model-value="setValue(obj)"
                   v-bind="obj.schema"
+                  :item-title="obj.schema['item-title'] || itemTitle"
+                  :item-value="obj.schema['item-value'] || itemValue"
                   @focus="onEvent($event, obj)"
-                  @change="onInput($event, obj)"
+                  @update:modelValue="onInput($event, obj)"
                   @blur="onEvent($event, obj)"
                 >    
-                  <template v-slot:[slot]="data" v-for="slot in Object.keys(obj.schema.slots)" v-if="obj.schema.enableSlots && obj.schema.slots">
-                    <slot :name="obj.schema.slots[slot].name" v-bind="data" :schema="obj.schema"></slot>
-                  </template>
-                  <template v-slot:prepend-item v-if="obj.schema.enableSlots && obj.schema.slots && obj.schema.slots['prepend-item']">
-                    <slot :name="obj.schema.slots['prepend-item'].name" :schema="obj.schema"></slot>
-                  </template>
+                <!-- Dynamic slots -->
+                <template
+                  v-for="slot in Object.keys(obj.schema.slots || {})"
+                  #[slot]="data"
+                  v-if="obj.schema.enableSlots && obj.schema.slots"
+                >
+                  <slot :name="obj.schema.slots[slot].name" v-bind="data" :schema="obj.schema"></slot>
+                </template>
+                <!-- Prepend item slot -->
+                <template
+                  #prepend-item
+                  v-if="obj.schema.enableSlots && obj.schema.slots && obj.schema.slots['prepend-item']"
+                >
+                  <slot :name="obj.schema.slots['prepend-item'].name" :schema="obj.schema"></slot>
+                </template>
                 </v-select>
 
                 <!-- treeview -->
@@ -114,36 +121,26 @@
                   transition="scale-transition"
                   :content-class="obj.schema.menuContentClass"
                 >
-                  <template v-slot:activator="{ on }">
+                  <template #activator="{ props }">
                     <v-text-field
-                      :value="obj.value"
-                      v-on="on"
-                      v-mask="obj.schema.mask"
-                      v-bind="obj.schema"
-                      @input="
-                        onInput($event, obj)
-                        setValueDate(obj.value, obj)
-                        obj.isDisplay = false
-                      "
-                      @change="
-                        onInput($event, obj)
-                        setValueDate(obj.value, obj)
-                      "
+                      :model-value="obj.value"
+                      v-maska
+                      data-maska="['XX-XX-XXXX']"
+                      v-bind="{ ...obj.schema, ...props }"
+                      @update:modelValue="onInput($event, obj)"
                       :id="obj.schema.id"
-                    ></v-text-field>
+                    />
                   </template>
                   <v-date-picker
-                    :value="obj.value ? formatDate(obj.value) : datePic"
+                    :model-value="obj.value ? formatDate(obj.value) : datePic"
                     :locale="obj.schema.locale ? obj.schema.locale : 'en-GB'"
                     :min="obj.schema.min"
                     :max="obj.schema.max"
-                    @input="obj.isDisplay = false"
-                    @focus="onEvent($event, obj)"
-                    @change="setValueDate($event, obj)"
+                    @update:modelValue="(val) => { setValueDate(val, obj); obj.isDisplay = false; }"
                     :show-current="true"
                     :no-title="true"
                     :required="true"
-                  ></v-date-picker>
+                  />
                 </v-menu>
 
                 <!-- Timepicker -->
@@ -159,12 +156,11 @@
                   min-width="290px"
                   transition="scale-transition"
                 >
-                  <template v-slot:activator="{ on }">
+                  <template #activator="{ props }">
                     <v-text-field
                       :value="obj.value"
-                      v-on="on"
-                      v-mask="obj.schema.mask"
-                      v-bind="obj.schema"
+                      v-maska="obj.schema.mask"
+                      v-bind="{...obj.schema, ...props}"
                       @input="onInput($event, obj)"
                       @change="onInput($event, obj)"
                       :id="obj.schema.id"
@@ -184,51 +180,46 @@
                     <v-toolbar-title>{{ obj.schema.label }}</v-toolbar-title>
                   </v-toolbar>
                   <v-list>
-                    <v-list-item-group
-                      v-model="obj.schema.model"
-                      v-bind="obj.schema"
-                      light
+                    <v-list-group
+                      v-for="(item, ix) in setValue(obj)"
+                      :key="ix"
+                      :value="obj.schema.model === item"
+                      @click="onEvent($event, obj, list)"
                     >
-                      <v-list-item
-                        v-for="(item, ix) in setValue(obj)"
-                        :key="ix"
-                        @click="onEvent($event, obj, list)"
-                      >
-                        <v-list-item-icon>
-                          <v-icon v-text="obj.schema.icon" />
-                        </v-list-item-icon>
-                        <v-list-item-content>
-                          <v-list-item-title
-                            v-text="
-                              obj.schema.item ? item[obj.schema.item] : item
-                            "
-                          />
-                        </v-list-item-content>
+                    <template #activator>
+                      <v-list-item>
+                        <template #prepend>
+                          <v-icon>{{ obj.schema.icon }}</v-icon>
+                        </template>
+                        <v-list-item-title>
+                          {{ obj.schema.item ? item[obj.schema.item] : item }}
+                        </v-list-item-title>
                       </v-list-item>
-                    </v-list-item-group>
+                    </template>
+                    </v-list-group>
                   </v-list>
                 </template>
 
                 <!-- checkbox | switch -->
-                <div
+                <component
                   :is="mapTypeToComponent(obj.schema.type)"
                   v-else-if="
                     obj.schema.type === 'switch' ||
                       obj.schema.type === 'checkbox'
                   "
-                  :input-value="setValue(obj)"
+                  :model-value="setValue(obj)"
                   v-bind="obj.schema"
-                  @change="onInput($event, obj)"
-                />
+                  @update:modelValue="onInput($event, obj)"
+                ></component>
 
                 <!-- file -->
                 <v-file-input
                   v-else-if="obj.schema.type === 'file'"
-                  :value="setValue(obj)"
+                  :model-value="setValue(obj)"
                   v-bind="obj.schema"
                   @focus="onEvent($event, obj)"
                   @blur="onEvent($event, obj)"
-                  @change="onInput($event, obj)"
+                  @update:modelValue="onInput($event, obj)"
                 />
 
                 <!-- icon -->
@@ -284,7 +275,7 @@
                   <v-icon v-if="obj.schema.iconCenter" :dark="obj.schema.dark">
                     {{ obj.schema.iconCenter }}
                   </v-icon>
-                  <font class="text-capitalize">{{ obj.schema.label }}</font>
+                  <v-label class="text-capitalize">{{ obj.schema.label }}</v-label>
                   <v-icon
                     v-if="obj.schema.iconRight"
                     right
@@ -296,24 +287,24 @@
 
                 <v-text-field
                   v-else-if="obj.schema.type === 'password'"
-                  :type="obj.passwordVisible ? 'text' : 'password'"
                   v-bind="obj.schema"
-                  :append-icon="obj.passwordVisible ? 'mdi-eye' : 'mdi-eye-off'"
+                  :type="obj.passwordVisible ? 'text' : 'password'"
+                  :append-inner-icon="obj.passwordVisible ? 'mdi-eye' : 'mdi-eye-off'"
                   :value="setValue(obj)"
                   @focus="onEvent($event, obj)"
                   @blur="onEvent($event, obj)"
-                  @click:append="togglePasswordVisibility(obj)"
+                  @click:append-inner="togglePasswordVisibility(obj)"
                   @click:append-outer="onEvent($event, obj, appendOuter)"
                   @click:clear="onEvent($event, obj, clear)"
                   @click:prepend="onEvent($event, obj, prepend)"
                   @click:prepend-inner="onEvent($event, obj, prependInner)"
-                  @input="onInput($event, obj)"
+                  @update:model-value="onInput($event, obj)"
                 />
 
                 <!-- only masked v-text-field use this Section - https://vuejs-tips.github.io/vue-the-mask/  -->
                 <v-text-field
                   v-else-if="obj.schema.mask"
-                  v-mask="obj.schema.mask"
+                  v-maska="obj.schema.mask"
                   v-bind="obj.schema"
                   :value="setValue(obj)"
                   @focus="onEvent($event, obj)"
@@ -323,24 +314,26 @@
                   @click:clear="onEvent($event, obj, clear)"
                   @click:prepend="onEvent($event, obj, prepend)"
                   @click:prepend-inner="onEvent($event, obj, prependInner)"
-                  @input="onInput($event, obj)"
+                  @update:modelValue="onInput($event, obj)"
                 />
 
                 <!-- all other Types - see typeToComponent -->
-                <div
+                <component
                   :is="mapTypeToComponent(obj.schema.type)"
                   v-else
                   v-bind="obj.schema"
-                  :value="setValue(obj)"
+                  :model-value="setValue(obj)"
                   @focus="onEvent($event, obj)"
                   @blur="onEvent($event, obj)"
+                  :item-title="obj.schema['item-text'] || itemTitle"
+                  :item-value="obj.schema['item-value'] || itemValue"
                   @click:append="onEvent($event, obj, append)"
                   @click:append-outer="onEvent($event, obj, appendOuter)"
                   @click:clear="onEvent($event, obj, clear)"
                   @click:prepend="onEvent($event, obj, prepend)"
                   @click:prepend-inner="onEvent($event, obj, prependInner)"
-                  @input="onInput($event, obj)"
-                />
+                  @update:modelValue="onInput($event, obj)"
+                ></component>
               </slot>
             </slot>
 
@@ -374,7 +367,7 @@ import {
   orderBy,
   delay
 } from 'lodash'
-import { mask } from 'vue-the-mask'
+import { vMaska } from "maska/vue"
 import moment from 'moment'
 
 const typeToComponent = {
@@ -399,8 +392,10 @@ const typeToComponent = {
   color: 'v-color-picker',
   date: 'v-date-picker',
   time: 'v-time-picker',
-  textarea: 'v-textarea'
+  textarea: 'v-textarea',
+  calendar: 'v-date-input'
 }
+// Declaration
 // Declaration
 const orderDirection = 'ASC'
 const pathDelimiter = '.'
@@ -453,7 +448,9 @@ export default {
   name: 'VFormBase',
 
   // Info Mask https://vuejs-tips.github.io/vue-the-mask/
-  directives: { mask },
+  directives: {
+    maska: vMaska
+  },
 
   props: {
     id: {
@@ -482,6 +479,8 @@ export default {
       appendOuter,
       prepend,
       prependInner,
+      itemTitle: 'text',
+      itemValue: 'value',
       menu: false,
       date: '',
       datePic: '',
@@ -512,19 +511,31 @@ export default {
       return p
     },
     index () {
-      const m = this.ref && this.ref.match(/\d+/g)
-      return m ? m.map(Number) : []
+      const m = this.ref && this.ref.match(/\d+$/)
+      return m ? Number(m[0]) : 0
     },
     flatCombinedArraySorted () {
       return orderBy(this.flatCombinedArray, ['schema.sort'], [orderDirection])
     },
     storeStateData () {
-      this.updateArrayFromState(this.value, this.schema)
       return this.value
     },
     storeStateSchema () {
-      this.updateArrayFromState(this.value, this.schema)
       return this.schema
+    }
+  },
+  watch: {
+    value: {
+      handler(newVal) {
+        this.updateArrayFromState(newVal, this.schema)
+      },
+      deep: true
+    },
+    schema: {
+      handler(newVal) {
+        this.updateArrayFromState(this.value, newVal)
+      },
+      deep: true
     }
   },
   methods: {
@@ -542,18 +553,8 @@ export default {
       }
     },
     setValueDate (enteredDate, obj) {
-      const date = new Date(enteredDate)
-      const validateDateFormat = moment(
-        enteredDate,
-        'YYYY-MM-DD',
-        true
-      ).isValid()
-      if (isNaN(enteredDate) && date.toString() !== 'Invalid Date') {
-        if (validateDateFormat) {
-          obj.value = moment(enteredDate, 'YYYY-MM-DD').format('DD-MM-YYYY')
-          this.onInput(obj.value, obj)
-        }
-      }
+      obj.value = moment(enteredDate).format('DD-MM-YYYY')
+      this.onInput(obj.value, obj)
     },
     mapTypeToComponent (type) {
       // map ie. schema:{ type:'password', ... } to vuetify control v-text-field'
@@ -651,13 +652,13 @@ export default {
       // get COL class from schema.col ->  schema:{ col:{ xs:12, md:4  } || col: 4 } // col: 4 -> is shorthand for -> col:{ xs:4 }
       const keysToGridClassName = key =>
         Object.keys(key)
-          .map(k => `col-${k}-${key[k]}`)
+          .map(k => `v-col-${k}-${key[k]}`)
           .join(' ') //  { xs:12, md:6, lg:4  } => 'col-xs-12 col-md-6 col-lg-4'
           
       return obj.schema.flex
         ? isPlainObject(obj.schema.flex)
           ? keysToGridClassName(obj.schema.flex)
-          : `col-xs-${obj.schema.flex}`
+          : `v-col-xs-${obj.schema.flex}`
         : ''
     },
     getOffsetGridClassName (obj) {
@@ -725,7 +726,7 @@ export default {
     setValue (obj) {
       // Control gets a Value
       return this.toCtrl({
-        value: obj.value,
+        value: obj?.value || '',
         obj,
         data: this.storeStateData,
         schema: this.storeStateSchema
@@ -761,7 +762,7 @@ export default {
       })
     },
     togglePasswordVisibility (obj) {
-      this.$set(obj, 'passwordVisible', !obj.passwordVisible)
+      obj.passwordVisible = !obj.passwordVisible
     },
     onEvent (event, obj, tag) {
       delay(() => {
@@ -770,6 +771,20 @@ export default {
         const open = obj.schema.open
         const index = this.index
 
+        console.log('onEvent',event.type, {
+          on: event.type,
+          id: this.ref,
+          index,
+          params: { text, tag, model, open, index },
+          key: obj.key,
+          value: obj.value,
+          obj,
+          event,
+          data: this.storeStateData,
+          schema: this.storeStateSchema,
+          parent: this.parent
+        });
+        
         this.emitValue(event.type, {
           on: event.type,
           id: this.ref,
@@ -826,14 +841,20 @@ export default {
     //
     // Emit Event Base
     emitValue (emit, val) {
+      console.log('here emitValue', { emit, val });
+
       this.parent.$emit(this.getEventName(emit), val) // listen to specific event only
       if (mouse.indexOf(emit) > -1)
+        console.log('mouse emitValue> -1', { emit, val });
         this.parent.$emit(this.getEventName('mouse'), val) // listen only to input
       if (change.indexOf(emit) > -1)
+        console.log('change emitValue> -1', { emit, val });
         this.parent.$emit(this.getEventName('change'), val) // listen only to input|click|
       if (watch.indexOf(emit) > -1)
+        console.log('watch emitValue> -1', { emit, val });
         this.parent.$emit(this.getEventName('watch'), val) // listen to focus|input|click|blur
       this.parent.$emit(this.getEventName('update'), val) // listen to all events
+      console.log('update emitValue> -1', { emit, val });
     },
     getEventName (eventName) {
       return this.parent.id !== defaultID

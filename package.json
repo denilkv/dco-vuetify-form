@@ -1,7 +1,7 @@
 {
     "name": "dco-vuetify-form",
-    "version": "0.1.31",
-    "description": "Forked from vuetify-form-base, added support for v-datepicker as calender",
+    "version": "0.2.0",
+    "description": "vuetify based form schema generator for vue 3.0",
     "main": "index.js",
     "scripts": {
         "test": "echo \"No test specified\""
