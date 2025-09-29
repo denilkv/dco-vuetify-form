@@ -262,7 +262,6 @@
                   :outlined="obj.schema.outlined"
                   :color="obj.schema.color"
                   :dark="obj.schema.dark"
-                  @click="onEvent($event, obj, button)"
                 >
                   <v-icon
                     v-if="obj.schema.iconLeft"
@@ -770,20 +769,6 @@ export default {
         const model = obj.schema.model
         const open = obj.schema.open
         const index = this.index
-
-        console.log('onEvent',event.type, {
-          on: event.type,
-          id: this.ref,
-          index,
-          params: { text, tag, model, open, index },
-          key: obj.key,
-          value: obj.value,
-          obj,
-          event,
-          data: this.storeStateData,
-          schema: this.storeStateSchema,
-          parent: this.parent
-        });
         
         this.emitValue(event.type, {
           on: event.type,
@@ -841,20 +826,14 @@ export default {
     //
     // Emit Event Base
     emitValue (emit, val) {
-      console.log('here emitValue', { emit, val });
-
       this.parent.$emit(this.getEventName(emit), val) // listen to specific event only
       if (mouse.indexOf(emit) > -1)
-        console.log('mouse emitValue> -1', { emit, val });
         this.parent.$emit(this.getEventName('mouse'), val) // listen only to input
       if (change.indexOf(emit) > -1)
-        console.log('change emitValue> -1', { emit, val });
         this.parent.$emit(this.getEventName('change'), val) // listen only to input|click|
       if (watch.indexOf(emit) > -1)
-        console.log('watch emitValue> -1', { emit, val });
         this.parent.$emit(this.getEventName('watch'), val) // listen to focus|input|click|blur
       this.parent.$emit(this.getEventName('update'), val) // listen to all events
-      console.log('update emitValue> -1', { emit, val });
     },
     getEventName (eventName) {
       return this.parent.id !== defaultID
@@ -867,8 +846,16 @@ export default {
       // resolves chained keys (like 'user.address.street') on an object and set the value
       let pathArray = path.split(pathDelimiter)
       pathArray.forEach((p, ix) => {
-        if (ix === pathArray.length - 1) this.$set(object, p, value)
-        object = object[p]
+        if (ix === pathArray.length - 1) {
+          // Vue 3: Direct assignment instead of this.$set
+          object[p] = value
+        } else {
+          // Ensure nested objects exist
+          if (!object[p] || typeof object[p] !== 'object') {
+            object[p] = {}
+          }
+          object = object[p]
+        }
       })
     },
     updateArrayFromState (data, schema) {
