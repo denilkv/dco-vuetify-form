@@ -1,6 +1,6 @@
 {
     "name": "dco-vuetify-form",
-    "version": "0.2.0",
+    "version": "2.0.1",
     "description": "vuetify based form schema generator for vue 3.0",
     "main": "index.js",
     "scripts": {
