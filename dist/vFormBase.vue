@@ -13,15 +13,7 @@
           <v-col
             v-show="!obj.schema.hidden"
             :key="index"
-            v-touch="{
-              left: () => onSwipe('left', obj),
-              right: () => onSwipe('right', obj),
-              up: () => onSwipe('up', obj),
-              down: () => onSwipe('down', obj)
-            }"
             :class="getClassName(obj)"
-            @mouseenter="onEvent($event, obj)"
-            @mouseleave="onEvent($event, obj)"
             v-bind="props"
           >
             <!-- slot on top of type  -> <div slot="slot-bottom-type-[propertyName]"> -->
@@ -36,16 +28,33 @@
                 <!-- radio -->
                 <v-radio-group
                   v-if="obj.schema.type === 'radio'"
-                  v-bind="obj.schema"
                   :model-value="setValue(obj)"
+                  :label="obj.schema.label"
+                  :color="obj.schema.color || 'primary'"
+                  :row="obj.schema.row !== false"
+                  :column="obj.schema.column"
+                  :disabled="obj.schema.disabled"
+                  :readonly="obj.schema.readonly"
+                  :hint="obj.schema.hint"
+                  :persistent-hint="obj.schema.persistentHint"
+                  :error="obj.schema.error"
+                  :error-messages="obj.schema.errorMessages"
+                  :rules="obj.schema.rules"
+                  :class="obj.schema.class"
+                  :data-qa="obj.schema['data-qa']"
+                  :mandatory="obj.schema.mandatory"
+                  :hide-details="obj.schema.hideDetails"
                   @update:modelValue="onInput($event, obj)"
+                  inline
                 >
                   <v-radio
-                    v-for="(o, ix) in obj.schema.options"
-                    :key="ix"
-                    v-bind="obj.schema"
-                    :label="sanitizeOptions(o).label"
-                    :value="sanitizeOptions(o).value"
+                    v-for="(option, ix) in obj.schema.options"
+                    :key="`${obj.key}-radio-${ix}-${option.value}`"
+                    :label="sanitizeOptions(option).label"
+                    :value="sanitizeOptions(option).value"
+                    :color="obj.schema.color || 'primary'"
+                    :disabled="obj.schema.disabled || sanitizeOptions(option).disabled"
+                    :ripple="obj.schema.ripple !== false"
                   />
                 </v-radio-group>
 
@@ -125,10 +134,16 @@
                     <v-text-field
                       :model-value="obj.value"
                       v-maska
-                      data-maska="['XX-XX-XXXX']"
+                      data-maska="['DD-MM-YYYY']"
                       v-bind="{ ...obj.schema, ...props }"
-                      @update:modelValue="onInput($event, obj)"
+                      @update:modelValue="onDirectDateInput($event, obj)"
+                      @blur="validateAndFormatDate($event, obj)"
+                      @keyup.enter="validateAndFormatDate($event, obj)"
                       :id="obj.schema.id"
+                      :error-messages="obj.dateError"
+                      placeholder="DD-MM-YYYY"
+                      :append-inner-icon="'mdi-calendar'"
+                      @click:append-inner="obj.isDisplay = !obj.isDisplay"
                     />
                   </template>
                   <v-date-picker
@@ -255,13 +270,14 @@
                 <!-- btn   -->
                 <v-btn
                   v-else-if="obj.schema.type === 'btn'"
-                  id="search"
                   :small="obj.schema.small"
                   :rounded="obj.schema.rounded"
                   :disabled="obj.schema.disabled"
                   :outlined="obj.schema.outlined"
                   :color="obj.schema.color"
                   :dark="obj.schema.dark"
+                  @click.prevent.stop="onEvent($event, obj)"
+
                 >
                   <v-icon
                     v-if="obj.schema.iconLeft"
@@ -289,7 +305,7 @@
                   v-bind="obj.schema"
                   :type="obj.passwordVisible ? 'text' : 'password'"
                   :append-inner-icon="obj.passwordVisible ? 'mdi-eye' : 'mdi-eye-off'"
-                  :value="setValue(obj)"
+                  :model-value="setValue(obj)"
                   @focus="onEvent($event, obj)"
                   @blur="onEvent($event, obj)"
                   @click:append-inner="togglePasswordVisibility(obj)"
@@ -538,22 +554,97 @@ export default {
     }
   },
   methods: {
-    formatDate (enteredDate) {
-      const date = new Date(enteredDate)
-      const validateDateFormat = moment(
-        enteredDate,
-        'DD-MM-YYYY',
-        true
-      ).isValid()
-      if (enteredDate && enteredDate.length > 6) {
-        if (validateDateFormat) {
-          return moment(enteredDate, 'DD-MM-YYYY').format('YYYY-MM-DD')
-        }
+    onDirectDateInput(value, obj) {
+      // Clear any previous error
+      obj.dateError = null;
+      
+      // Update the value immediately for user feedback
+      obj.value = value;
+      
+      // If the input is complete (10 characters), validate it
+      if (value && value.length === 10) {
+        this.validateAndFormatDate({ target: { value } }, obj);
       }
     },
-    setValueDate (enteredDate, obj) {
-      obj.value = moment(enteredDate).format('DD-MM-YYYY')
-      this.onInput(obj.value, obj)
+
+    validateAndFormatDate(event, obj) {
+      const inputValue = event.target.value;
+      
+      if (!inputValue) {
+        obj.dateError = null;
+        this.onInput(null, obj);
+        return;
+      }
+
+      // Check if the input matches DD-MM-YYYY format
+      const dateRegex = /^(\d{2})-(\d{2})-(\d{4})$/;
+      const match = inputValue.match(dateRegex);
+      
+      if (!match) {
+        obj.dateError = 'Please enter date in DD-MM-YYYY format';
+        return;
+      }
+
+      const [, day, month, year] = match;
+      
+      // Validate the date using moment
+      const isValidDate = moment(`${day}-${month}-${year}`, 'DD-MM-YYYY', true).isValid();
+      
+      if (!isValidDate) {
+        obj.dateError = 'Please enter a valid date';
+        return;
+      }
+
+      // Check against min/max constraints if they exist
+      const inputDate = moment(`${day}-${month}-${year}`, 'DD-MM-YYYY');
+      
+      if (obj.schema.min) {
+        const minDate = moment(obj.schema.min);
+        if (inputDate.isBefore(minDate, 'day')) {
+          obj.dateError = `Date must be after ${minDate.format('DD-MM-YYYY')}`;
+          return;
+        }
+      }
+      
+      if (obj.schema.max) {
+        const maxDate = moment(obj.schema.max);
+        if (inputDate.isAfter(maxDate, 'day')) {
+          obj.dateError = `Date must be before ${maxDate.format('DD-MM-YYYY')}`;
+          return;
+        }
+      }
+
+      // Clear error and update value
+      obj.dateError = null;
+      obj.value = inputValue;
+      this.onInput(inputValue, obj);
+    },
+
+    formatDate(enteredDate) {
+      if (!enteredDate) return null;
+      
+      const date = new Date(enteredDate);
+      const validateDateFormat = moment(enteredDate, 'DD-MM-YYYY', true).isValid();
+      
+      if (enteredDate && enteredDate.length > 6) {
+        if (validateDateFormat) {
+          return moment(enteredDate, 'DD-MM-YYYY').format('YYYY-MM-DD');
+        }
+        // If it's already in YYYY-MM-DD format (from date picker)
+        if (moment(enteredDate, 'YYYY-MM-DD', true).isValid()) {
+          return enteredDate;
+        }
+      }
+      return null;
+    },
+
+    setValueDate(enteredDate, obj) {
+      if (!enteredDate) return;
+      
+      const formattedDate = moment(enteredDate).format('DD-MM-YYYY');
+      obj.value = formattedDate;
+      obj.dateError = null;
+      this.onInput(formattedDate, obj);
     },
     mapTypeToComponent (type) {
       // map ie. schema:{ type:'password', ... } to vuetify control v-text-field'
@@ -717,15 +808,62 @@ export default {
     },
     //
     // Button-Toggle sanitize item from array schema.options
-    sanitizeOptions (b) {
-      return isString(b) ? { value: b, label: b } : b
+    sanitizeOptions (option) {
+      // Handle string shorthand notation
+      if (isString(option)) {
+        return { value: option, label: option }
+      }
+      
+      // Handle object with proper type preservation for boolean values
+      if (isPlainObject(option)) {
+        return {
+          label: option.label || String(option.value),
+          value: option.value, // Preserve original type (boolean, string, number)
+          disabled: option.disabled || false
+        }
+      }
+      
+      // Handle primitive values (boolean, number, etc.)
+      return {
+        label: String(option),
+        value: option
+      }
     },
     //
     // Set Value
     setValue (obj) {
-      // Control gets a Value
+      const rawValue = obj?.value
+      
+      // Special handling for radio buttons with boolean values
+      if (obj.schema.type === 'radio') {
+        // Return null for unselected state
+        if (rawValue === null || rawValue === undefined) {
+          return null
+        }
+        
+        // For boolean values, ensure strict type matching
+        if (typeof rawValue === 'boolean') {
+          return rawValue
+        }
+        
+        // Handle string boolean conversion
+        if (typeof rawValue === 'string') {
+          if (rawValue.toLowerCase() === 'true') return true
+          if (rawValue.toLowerCase() === 'false') return false
+        }
+        
+        // Handle numeric boolean conversion
+        if (typeof rawValue === 'number') {
+          if (rawValue === 1) return true
+          if (rawValue === 0) return false
+        }
+        
+        return rawValue
+      }
+      
+      // Use existing toCtrl logic for other types
       return this.toCtrl({
-        value: obj?.value || '',
+        value: rawValue || '',
         obj,
         data: this.storeStateData,
         schema: this.storeStateSchema
@@ -734,27 +872,39 @@ export default {
     //
     // Get Value from Input & other Events
     onInput (value, obj) {
-      // Value after change in Control
-      value = this.fromCtrl({
+      // Apply fromCtrl transformation first
+      let processedValue = this.fromCtrl({
         value,
         obj,
         data: this.storeStateData,
         schema: this.storeStateSchema
       })
 
-      // harmonize empty strings to null, because clearable resets to null and not to empty string!
-      value = value === '' ? null : value
+      // Special handling for radio buttons to preserve boolean types
+      if (obj.schema.type === 'radio') {
+        // Don't convert boolean false to null for radio buttons
+        if (typeof processedValue === 'boolean') {
+          // Keep boolean values as-is
+        } else {
+          // For other radio types, handle empty values
+          processedValue = processedValue === '' ? null : processedValue
+        }
+      } else {
+        // For non-radio types, harmonize empty strings to null
+        processedValue = processedValue === '' ? null : processedValue
+      }
 
-      // update deep nested prop(key) with value
-      this.setObjectByPath(this.storeStateData, obj.key, value)
+      // Update deep nested prop(key) with value
+      this.setObjectByPath(this.storeStateData, obj.key, processedValue)
 
+      // Emit the change event
       this.emitValue('input', {
         on: 'input',
         id: this.ref,
         index: this.index,
         params: { index: this.index, lastValue: obj.value },
         key: obj.key,
-        value,
+        value: processedValue,
         obj,
         data: this.storeStateData,
         schema: this.storeStateSchema
@@ -910,7 +1060,7 @@ export default {
         // Initialize passwordVisible for password type fields
         const objData = { key, value: data[key], schema: schema[key] }
         if (schema[key].type === 'password') {
-          objData.passwordVisible = false
+          objData.passwordVisible = schema[key].passwordVisible
         }
         arr.push(objData)
       })
