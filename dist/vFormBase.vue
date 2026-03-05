@@ -87,6 +87,7 @@
                   @focus="onEvent($event, obj)"
                   @update:modelValue="onInput($event, obj)"
                   @blur="onEvent($event, obj)"
+                  item-props
                 >    
                 <!-- Dynamic slots -->
                 <template
